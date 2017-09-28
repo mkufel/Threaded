@@ -21,6 +21,23 @@
 
 int main (void)
 {
+
+    int buffer_index;
+    int bit_index;
+    int currentMultiple = 2;
+
+    printf("\n %x \n", 60);
+
+    for (int i = 2; i < 30; i++) {
+        if(i % currentMultiple == 0){
+            buffer_index = i / 128;
+            bit_index = i % 128;
+            printf("Current i: %x. Initial: %llx \n", i, (int) buffer[buffer_index]);
+            buffer[buffer_index] = buffer[buffer_index] ^ (1 << bit_index);
+            printf("Flipped: %x\n \n", (int) buffer[buffer_index]);
+        }
+    }
+
     // TODO: start threads to flip the pieces and output the results
     // (see thread_test() and thread_mutex_test() how to use threads and mutexes,
     //  see bit_test() how to manipulate bits in a large integer)
