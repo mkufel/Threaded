@@ -38,39 +38,50 @@ void printBits(size_t const size, void const * const ptr)
 }
 
 static void *
-do_flip(void) {
+do_flip(void * arg) {
 
     int buffer_index;
     int bit_index;
+
+    int     parameter;
+    parameter = * (int *) arg;              // get the integer value of the pointer
+//    free (arg);             // we retrieved the integer value, so now the pointer can be deleted
+
+    printf ("parameter=%d \n", parameter);
+
     for (int i = 2; i < 30; i++) {
-        if(i % 2 == 0){
+        if(i % parameter == 0){
 
             buffer_index = i / 128;
             bit_index = i % 128;
 
-            printf("Before ");
+            printf("Before: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
 
             buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
 
-            printf("\n After ");
+            printf("\n After: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
             printf("\n");
         }
     }
-//    pthread_exit(2);
+    return NULL;
 }
 
 int main (void)
 {
 
-    pthread_t   my_threads[NROF_THREADS];
-    int multiple = 2;
+    pthread_t   my_threads[NROF_THREADS];   //array of thread id's
 
-    for (int i = 0; i < NROF_THREADS; i++) {
-        pthread_create(&my_threads[i], NULL, do_flip, NULL);
+    int *       parameter;   // parameter to be handed over to the thread
+    parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
+    *parameter = 2;        // assign an arbitrary value...
+
+
+    for (int i = 1; i < NROF_THREADS; i++) {
+        pthread_create(&my_threads[i], NULL, do_flip, parameter);
         pthread_join (my_threads[i], NULL);
-        multiple++;
+        *parameter = 2 + i;
     }
 
     // TODO: start threads to flip the pieces and output the results
