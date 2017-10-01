@@ -85,24 +85,24 @@ bit_test (void)
     BIT_SET (v, 4);
     printf ("v (many 1's): %lx%016lx\n", HI(v), LO(v));
     printf ("\n");
-}    
-    
-    
+}
+
+
 static void *
 my_thread (void * arg)
 {
-    int *   argi; 
-    int     i;      
+    int *   argi;
+    int     i;
     int *   rtnval;
-    
+
     argi = (int *) arg;     // proper casting before dereferencing (could also be done in one statement)
     i = *argi;              // get the integer value of the pointer
     free (arg);             // we retrieved the integer value, so now the pointer can be deleted
-    
+
     printf ("        %lx: thread started; parameter=%d\n", pthread_self(), i);
-    
+
     sleep (1);
-    
+
     // a return value to be given back to the calling main-thread
     rtnval = malloc (sizeof (int)); // will be freed by the parent-thread
     *rtnval = 42;           // assign an arbitrary value...
@@ -177,7 +177,7 @@ thread_mutex_test (void)
 int main (void)
 {
     bit_test();
-    thread_test();
+//    thread_test();
     thread_mutex_test();
     
     return (0);

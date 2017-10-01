@@ -38,41 +38,38 @@ void printBits(size_t const size, void const * const ptr)
 }
 
 static void *
-do_flip(int currentMultiple) {
+do_flip(void) {
+
     int buffer_index;
     int bit_index;
     for (int i = 2; i < 30; i++) {
-        if(i % currentMultiple == 0){
+        if(i % 2 == 0){
+
             buffer_index = i / 128;
             bit_index = i % 128;
 
             printf("Before ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
+
             buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
+
             printf("\n After ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
             printf("\n");
         }
     }
+//    pthread_exit(2);
 }
 
 int main (void)
 {
-    int *       parameter;
-    int *       rtnval;
-    pthread_t   thread_id;
+
+    pthread_t   my_threads[NROF_THREADS];
     int multiple = 2;
 
-    // parameter to be handed over to the thread
-    parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
-    *parameter = 73;        // assign an arbitrary value...
-
     for (int i = 0; i < NROF_THREADS; i++) {
-        printf ("starting thread for %d\n", multiple);
-        pthread_create(&thread_id, NULL, do_flip(multiple), parameter);
-        //pthread_exit(2);
-        //pthread_join (thread_id, NULL);
-        //free(rtnval);
+        pthread_create(&my_threads[i], NULL, do_flip, NULL);
+        pthread_join (my_threads[i], NULL);
         multiple++;
     }
 
