@@ -15,31 +15,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
 #include "uint128.h"
 #include "flip.h"
-#include "unistd.h"
 #include <pthread.h>
 
-static void *
-my_thread (void * arg)
+
+void printBits(size_t const size, void const * const ptr)
 {
-    int *   argi;
-    int     i;
-    int *   rtnval;
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
 
-    argi = (int *) arg;     // proper casting before dereferencing (could also be done in one statement)
-    i = *argi;              // get the integer value of the pointer
-    free (arg);             // we retrieved the integer value, so now the pointer can be deleted
-
-    printf ("        %lx: thread started; parameter=%d\n", pthread_self(), i);
-
-    sleep (1);
-
-    // a return value to be given back to the calling main-thread
-    rtnval = malloc (sizeof (int)); // will be freed by the parent-thread
-    *rtnval = 42;           // assign an arbitrary value...
-    return (rtnval);        // you can also use pthread_exit(rtnval);
+    for (i=size-1;i>=0;i--)
+    {
+        for (j=7;j>=0;j--)
+        {
+            byte = (b[i] >> j) & 1;
+            printf("%u", byte);
+        }
+    }
+    puts("");
 }
 
 static void *
@@ -50,9 +45,13 @@ do_flip(int currentMultiple) {
         if(i % currentMultiple == 0){
             buffer_index = i / 128;
             bit_index = i % 128;
-            printf("Current i: %d. Initial: %d \n", i, (int) buffer[buffer_index]);
-            buffer[buffer_index] = buffer[buffer_index] ^ (1 << bit_index);
-            printf("Flipped: %d\n \n", (int) buffer[buffer_index]);
+
+            printf("Before ");
+            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
+            buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
+            printf("\n After ");
+            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
+            printf("\n");
         }
     }
 }
