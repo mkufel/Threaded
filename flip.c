@@ -20,6 +20,9 @@
 #include <pthread.h>
 
 
+static pthread_mutex_t      mutex          = PTHREAD_MUTEX_INITIALIZER;
+
+
 void printBits(size_t const size, void const * const ptr)
 {
     unsigned char *b = (unsigned char*) ptr;
@@ -58,7 +61,11 @@ do_flip(void * arg) {
             printf("Before: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
 
+            pthread_mutex_lock (&mutex);
+
             buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
+
+            pthread_mutex_unlock (&mutex);
 
             printf("\n After: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
@@ -73,16 +80,21 @@ int main (void)
 
     pthread_t   my_threads[NROF_THREADS];   //array of thread id's
 
-    int *       parameter;   // parameter to be handed over to the thread
+    int *       parameter;   			// parameter to be handed over to the thread
     parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
-    *parameter = 2;        // assign an arbitrary value...
+    *parameter = 2;        				// assign an arbitrary value...
 
 
-    for (int i = 1; i < NROF_THREADS; i++) {
-        pthread_create(&my_threads[i], NULL, do_flip, parameter);
-        pthread_join (my_threads[i], NULL);
-        *parameter = 2 + i;
+    for (int i = 1; i < NROF_THREADS; i++) {	
+        pthread_create(&my_threads[i], NULL, do_flip, parameter);	//make a thread to the flipping with a certain parameter
+        *parameter = 2 + i;											//increase the parameter
     }
+
+    for (int j = 0; j < sizeof(my_threads); j++) 					//wait for all threads to terminate
+    {
+    	pthread_join (my_threads[j], NULL);
+    }
+    
 
     // TODO: start threads to flip the pieces and output the results
     // (see thread_test() and thread_mutex_test() how to use threads and mutexes,
