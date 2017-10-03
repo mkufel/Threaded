@@ -18,6 +18,7 @@
 #include "uint128.h"
 #include "flip.h"
 #include <pthread.h>
+#include <unistd.h>
 
 
 static pthread_mutex_t      mutex          = PTHREAD_MUTEX_INITIALIZER;
@@ -46,30 +47,39 @@ do_flip(void * arg) {
     int buffer_index;
     int bit_index;
 
-    int     parameter;
-    parameter = * (int *) arg;              // get the integer value of the pointer
+    int     param = 2;
+    param = * (int *) arg;              // get the integer value of the pointer
 //    free (arg);             // we retrieved the integer value, so now the pointer can be deleted
 
-    printf ("parameter=%d \n", parameter);
 
-    for (int i = 2; i < 30; i++) {
-        if(i % parameter == 0){
+    for (int i = 2; i < 11; i++) {
+        if(i % param == 0){
 
             buffer_index = i / 128;
             bit_index = i % 128;
 
+
+            printf ("        %lx: thread start; wanting to enter CS...\n", pthread_self());
+
+            pthread_mutex_lock (&mutex);
+            printf ("        %lx: thread entered CS\n", pthread_self());
+
             printf("Before: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
 
-            pthread_mutex_lock (&mutex);
-
+//            sleep(1);
             buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
-
-            pthread_mutex_unlock (&mutex);
 
             printf("\n After: ");
             printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
             printf("\n");
+
+            printf ("        %lx: thread leaves CS\n", pthread_self());
+
+            pthread_mutex_unlock (&mutex);
+
+//            sleep(1);
+
         }
     }
     return NULL;
@@ -82,23 +92,28 @@ int main (void)
 
     int *       parameter;   			// parameter to be handed over to the thread
     parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
-    *parameter = 2;        				// assign an arbitrary value...
+    * parameter = 1;        				// assign an arbitrary value...
 
 
-    for (int i = 1; i < NROF_THREADS; i++) {	
+    for (int i = 0; i < NROF_THREADS; i++) {
+        *parameter += i;											//increase the parameter
         pthread_create(&my_threads[i], NULL, do_flip, parameter);	//make a thread to the flipping with a certain parameter
-        *parameter = 2 + i;											//increase the parameter
+//        printf("Started thread nr: %d\n", i);
+//        sleep(2);
     }
 
-    for (int j = 0; j < sizeof(my_threads); j++) 					//wait for all threads to terminate
+//    printf("%d", (int) sizeof(my_threads));
+    for (int j = 0; j < sizeof(my_threads)/8; j++) 					//wait for all threads to terminate
     {
+//        printf("Waiting for thread: %d \n", j);
     	pthread_join (my_threads[j], NULL);
     }
-    
+
+    printf("Ready to terminate");
 
     // TODO: start threads to flip the pieces and output the results
     // (see thread_test() and thread_mutex_test() how to use threads and mutexes,
-    //  see bit_test() how to manipulate bits in a large integer)
+    ////  see bit_test() how to manipulate bits in a large integer)
 
 
     return (0);
