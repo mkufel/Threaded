@@ -20,9 +20,15 @@
 #include <pthread.h>
 #include <unistd.h>
 
+// create a bitmask where bit at position n is set
+#define BITMASK          ((uint128_t) 0xffffffffffffffff)
+
+// check if bit n in v is set
+#define BIT_IS_SET(v,n)     (((v) & BITMASK(n)) == BITMASK(n))
 
 static pthread_mutex_t      mutex          = PTHREAD_MUTEX_INITIALIZER;
 
+static bool * isThreadInitialized = true;
 
 void printBits(size_t const size, void const * const ptr)
 {
@@ -38,7 +44,7 @@ void printBits(size_t const size, void const * const ptr)
             printf("%u", byte);
         }
     }
-    puts("");
+    puts("\n");
 }
 
 static void *
@@ -47,39 +53,33 @@ do_flip(void * arg) {
     int buffer_index;
     int bit_index;
 
-    int     param = 2;
-    param = * (int *) arg;              // get the integer value of the pointer
-//    free (arg);             // we retrieved the integer value, so now the pointer can be deleted
+    int *   argi;
+    int     param;
 
+    argi = (int *) arg;     // proper casting before dereferencing (could also be done in one statement)
+    param = *argi;              // get the integer value of the pointer
+//    printf("Pointer to arg: %p, pointer to argi: %p, pointer to i %p\n", arg, argi, (&param));
+    isThreadInitialized = true;
 
-    for (int i = 2; i < 11; i++) {
-        if(i % param == 0){
+    for (int i = 2; i < NROF_PIECES; i++) {
 
+        if(i % param == 0)
+        {
             buffer_index = i / 128;
             bit_index = i % 128;
 
-
-            printf ("        %lx: thread start; wanting to enter CS...\n", pthread_self());
-
             pthread_mutex_lock (&mutex);
-            printf ("        %lx: thread entered CS\n", pthread_self());
 
-            printf("Before: ");
-            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
+//            printf("Before with param: %d and a piece: %d\n", param, i);
+//            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
 
-//            sleep(1);
-            buffer[buffer_index] ^= (uint128_t) 1 << bit_index;
+            buffer[buffer_index] ^= (uint128_t) 1 << bit_index-1;
 
-            printf("\n After: ");
-            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
-            printf("\n");
-
-            printf ("        %lx: thread leaves CS\n", pthread_self());
+//            printf("\n After: ");
+//            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
+//            printf("\n");
 
             pthread_mutex_unlock (&mutex);
-
-//            sleep(1);
-
         }
     }
     return NULL;
@@ -92,24 +92,47 @@ int main (void)
 
     int *       parameter;   			// parameter to be handed over to the thread
     parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
-    * parameter = 1;        				// assign an arbitrary value...
+    *parameter = 1;        				// assign an arbitrary value...
 
 
     for (int i = 0; i < NROF_THREADS; i++) {
-        *parameter += i;											//increase the parameter
-        pthread_create(&my_threads[i], NULL, do_flip, parameter);	//make a thread to the flipping with a certain parameter
-//        printf("Started thread nr: %d\n", i);
-//        sleep(2);
+
+        if (isThreadInitialized)
+        {
+            *parameter += 1;                                            //increase the parameter
+            pthread_create(&my_threads[i], NULL, do_flip,
+                           parameter);    //make a thread to the flipping with a certain parameter
+            isThreadInitialized = false;
+        }
+        else if (i < NROF_THREADS)
+        {
+
+            i--;
+        }
+        else break;
     }
 
-//    printf("%d", (int) sizeof(my_threads));
     for (int j = 0; j < sizeof(my_threads)/8; j++) 					//wait for all threads to terminate
     {
-//        printf("Waiting for thread: %d \n", j);
     	pthread_join (my_threads[j], NULL);
     }
 
-    printf("Ready to terminate");
+    printBits(sizeof(uint128_t), &buffer[0]);
+    uint128_t mask = 1;
+
+    printBits(sizeof(uint128_t), &mask);
+
+    for (int k = 0; k < sizeof(buffer)/sizeof(uint16_t); k++) {
+        for (int i = 0; i < sizeof(uint128_t); i++) {
+            if (buffer[k]  & mask << i
+            && ((k*128) + i) < NROF_PIECES)
+            {
+                printf("%d, ", (k*128) + i);
+            }
+        }
+    }
+
+    printf("\n");
 
     // TODO: start threads to flip the pieces and output the results
     // (see thread_test() and thread_mutex_test() how to use threads and mutexes,
