@@ -27,78 +27,29 @@
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t isThreadInitialized = PTHREAD_MUTEX_INITIALIZER;
 
-void printBits(size_t const size, void const * const ptr)
-{
-    unsigned char *b = (unsigned char*) ptr;
-    unsigned char byte;
-    int i, j;
-
-    for (i=size-1;i>=0;i--)
-    {
-        for (j=7;j>=0;j--)
-        {
-            byte = (b[i] >> j) & 1;
-            printf("%u", byte);
-        }
-    }
-    puts("\n");
-}
-
-
-/*
- * rsleep(int t)
- *
- * The calling thread will be suspended for a random amount of time
- * between 0 and t microseconds
- * At the first call, the random generator is seeded with the current time
- */
-static void rsleep (int t)
-{
-    static bool first_call = true;
-
-    if (first_call == true)
-    {
-        srandom (time(NULL) % getpid());
-        first_call = false;
-    }
-    usleep (random () % t);
-}
-
 static void *
 do_flip(void * arg) {
 
     int buffer_index;
     int bit_index;
-
     int *   argi;
     int     param;
 
     argi = (int *) arg;     // proper casting before dereferencing (could also be done in one statement)
-    param = *argi;              // get the integer value of the pointer
-//    printf("Pointer to arg: %p, pointer to argi: %p, pointer to i %p\n", arg, argi, (&param));
+    param = *argi;          // get the integer value of the pointer
     pthread_mutex_unlock (&isThreadInitialized);
 
     for (int i = 2; i <= NROF_PIECES; i++) {
 
         if(i % param == 0)
         {
-            buffer_index = i / 128;
-            bit_index = i % 128;
+            buffer_index = i / 128; // The index of the buffer
+            bit_index = i % 128; // The index of the bit in the buffer
+            pthread_mutex_lock (&mutex); // Lock before entering critical section
 
-            pthread_mutex_lock (&mutex);
+            buffer[buffer_index] ^= (uint128_t) 1 << bit_index-1; // critical section
 
-//            printf("Before with param: %d and a piece: %d\n", param, i);
-//            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
-//            printf("Flipping bit nr: %d as a multiple of %d\n", i, param);
-
-            buffer[buffer_index] ^= (uint128_t) 1 << bit_index-1;
-//            printf("After shift with param: %d, iteration: %d\n", param, i);
-
-//            printf("\n After: ");
-//            printBits(sizeof(buffer[buffer_index]), &buffer[buffer_index]);
-//            printf("\n");
-
-            pthread_mutex_unlock (&mutex);
+            pthread_mutex_unlock (&mutex); // Unlock after leaving the critical section
         }
     }
     return NULL;
@@ -107,7 +58,7 @@ do_flip(void * arg) {
 int main (void)
 {
     for (int l = 0; l < sizeof(buffer)/16; ++l) {
-        buffer[l] = ~ 0;
+        buffer[l] = ~ 0; //Set all bits to 1
     }
 
     pthread_t   my_threads[NROF_THREADS];   //array of thread id's
@@ -118,7 +69,6 @@ int main (void)
 
 
     for (int i = 0; i < NROF_THREADS; i++) {
-
             pthread_mutex_lock (&isThreadInitialized);
             *parameter += 1;                                            //increase the parameter
             pthread_create(&my_threads[i], NULL, do_flip,
@@ -127,31 +77,19 @@ int main (void)
 
     for (int j = 0; j < sizeof(my_threads)/8; j++) 					//wait for all threads to terminate
     {
-    	pthread_join (my_threads[j], NULL);
+    	pthread_join (my_threads[j], NULL); // Wait for the threads
     }
-
-    printBits(sizeof(uint128_t), &buffer[0]);
     uint128_t mask = 1;
-
-    printBits(sizeof(uint128_t), &mask);
 
     for (int k = 0; k < sizeof(buffer)/16; k++) {
         for (int i = 0; i < 128; i++) {
             if (buffer[k]  & mask << i
             && ((k*128) + i) < NROF_PIECES)
             {
-                printf("%d, ", (k*128) + i + 1);
+                printf("%d \n", (k*128) + i + 1); // Output the numbers
             }
         }
     }
-
-    printf("\n");
-
-    // TODO: start threads to flip the pieces and output the results
-    // (see thread_test() and thread_mutex_test() how to use threads and mutexes,
-    ////  see bit_test() how to manipulate bits in a large integer)
-
-
     return (0);
 }
 
