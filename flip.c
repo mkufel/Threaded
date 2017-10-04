@@ -2,8 +2,8 @@
  * Operating Systems [2INCO] Practical Assignment
  * Threaded Application
  *
- * STUDENT_NAME_1 (STUDENT_NR_1)
- * STUDENT_NAME_2 (STUDENT_NR_2)
+ * Ahmed Ahres (0978238)
+ * Maciej Kufel (0944597)
  *
  * Grading:
  * Students who hand in clean code that fully satisfies the minimum requirements will get an 8. 
