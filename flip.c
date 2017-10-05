@@ -24,29 +24,36 @@ static pthread_mutex_t mutexes[sizeof(buffer)/sizeof(uint128_t )];
 static uint128_t mask = 1; // bit mask used to check the result, initialize with LSB = 1
 
 
+struct arg_struct {
+    int arg1;
+    int arg2;
+};
+
 
 static void *
-do_flip(void * arg) {   //thread job, flip multiples of the passed parameter
+do_flip(void * args) {   //thread job, flip multiples of the passed parameter
 
     int buffer_index;
     int bit_index;
-    int     param;
+    struct arg_struct *arguments = args;
+    int param_start = arguments->arg1;
+    int param_end = arguments->arg2;
 
-    param = * (int *) arg;     // casting and dereferencing the passed argument pointer
     pthread_mutex_unlock (&threadInitMutex); // value of the param 'retrieved', unlock the threadInitMutex
 
     for (int i = 2; i <= NROF_PIECES; i++) {
+        for (int j = param_start; j <= param_end; j++) {
 
-        if(i % param == 0)
-        {
-            buffer_index = (i-1) / 128; // The index of the buffer
-            bit_index = (i-1) % 128; // The index of the bit in the buffer
+            if (i % j == 0) {
+                buffer_index = (i - 1) / 128; // The index of the buffer
+                bit_index = (i - 1) % 128; // The index of the bit in the buffer
 
-            pthread_mutex_lock (&mutexes[buffer_index]); // Lock the mutex of the buffer you want to flip
+                pthread_mutex_lock(&mutexes[buffer_index]); // Lock the mutex of the buffer you want to flip
+//                printf("Piece: %d divisible by: %d, flipping...\n", i, j);
+                buffer[buffer_index] ^= (uint128_t) 1 << bit_index; // critical section, flip the bit
 
-            buffer[buffer_index] ^= (uint128_t) 1 << bit_index; // critical section, flip the bit
-
-            pthread_mutex_unlock (&mutexes[buffer_index]); // Unlock after leaving the critical section
+                pthread_mutex_unlock(&mutexes[buffer_index]); // Unlock after leaving the critical section
+            }
         }
     }
 
@@ -67,19 +74,30 @@ void initialize(void)   //Initialize mutexes and set the buffer bits to 1
 void create_and_execute_threads(void)
 {
     pthread_t   my_threads[NROF_THREADS];   //array of thread id's
+//
+//    int *       parameter_start;   			// parameter to be handed over to the thread
+//    parameter_start = malloc (sizeof (int));  // memory will be freed by the child-thread
+    int parameter_start = 1;        				// assign an arbitrary value
 
-    int *       parameter;   			// parameter to be handed over to the thread
-    parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
-    *parameter = 1;        				// assign an arbitrary value
+//    int *       parameter_end;   			// parameter to be handed over to the thread
+//    parameter_end = malloc (sizeof (int));  // memory will be freed by the child-thread
+    int parameter_end = NROF_PIECES/NROF_THREADS;  // assign an arbitrary value
+    int equal_piece = NROF_PIECES/NROF_THREADS;
+
+    struct arg_struct args;
+    args.arg1 = (int) parameter_start;
+    args.arg2 = (int) parameter_end;
 
 
     for (int i = 0; i < NROF_THREADS; i++) {            //create threads
         //lock the threadInitMutex, enter iff previously created thread already dereferenced the parameter pointer)
         pthread_mutex_lock (&threadInitMutex);
+        args.arg1 = i * equal_piece + 1;
+        if (i == 0 ) args.arg1++;
+        args.arg2 = (i+1) * equal_piece;
+        pthread_create(&my_threads[i], NULL, do_flip, (void *) &args); //make a thread to the flipping with a certain parameter
 
-        * parameter += 1;                               //increase the parameter
-        pthread_create(&my_threads[i], NULL, do_flip,
-                       parameter);                      //make a thread to the flipping with a certain parameter
+
     }
 
     for (int j = 0; j < sizeof(my_threads)/sizeof(uint64_t); j++) 					//wait for all threads to terminate
