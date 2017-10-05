@@ -25,6 +25,35 @@ static uint128_t mask = 1; // bit mask used to check the result, initialize with
 
 
 
+static void *
+do_flip(void * arg) {   //thread job, flip multiples of the passed parameter
+
+    int buffer_index;
+    int bit_index;
+    int     param;
+
+    param = * (int *) arg;     // casting and dereferencing the passed argument pointer
+    pthread_mutex_unlock (&threadInitMutex); // value of the param 'retrieved', unlock the threadInitMutex
+
+    for (int i = 2; i <= NROF_PIECES; i++) {
+
+        if(i % param == 0)
+        {
+            buffer_index = (i-1) / 128; // The index of the buffer
+            bit_index = (i-1) % 128; // The index of the bit in the buffer
+
+            pthread_mutex_lock (&mutexes[buffer_index]); // Lock the mutex of the buffer you want to flip
+
+            buffer[buffer_index] ^= (uint128_t) 1 << bit_index; // critical section, flip the bit
+
+            pthread_mutex_unlock (&mutexes[buffer_index]); // Unlock after leaving the critical section
+        }
+    }
+
+    return NULL;
+}
+
+
 void initialize(void)   //Initialize mutexes and set the buffer bits to 1
 {
     for (int i = 0; i < sizeof(buffer)/sizeof(uint128_t ); i++) {
@@ -60,33 +89,6 @@ void create_and_execute_threads(void)
 }
 
 
-static void *
-do_flip(void * arg) {   //thread job, flip multiples of the passed parameter
-
-    int buffer_index;
-    int bit_index;
-    int     param;
-
-    param = * (int *) arg;     // casting and dereferencing the passed argument pointer
-    pthread_mutex_unlock (&threadInitMutex); // value of the param 'retrieved', unlock the threadInitMutex
-
-    for (int i = 2; i <= NROF_PIECES; i++) {
-
-        if(i % param == 0)
-        {
-            buffer_index = i / 128; // The index of the buffer
-            bit_index = i % 128; // The index of the bit in the buffer
-
-            pthread_mutex_lock (&mutexes[buffer_index]); // Lock the mutex of the buffer you want to flip
-
-            buffer[buffer_index] ^= (uint128_t) 1 << bit_index-1; // critical section, flip the bit
-
-            pthread_mutex_unlock (&mutexes[buffer_index]); // Unlock after leaving the critical section
-        }
-    }
-
-    return NULL;
-}
 
 
 void print_output(void)
@@ -97,7 +99,7 @@ void print_output(void)
             //if buffer element LAND mask with the 1 shifted i-places to the left and the bit within the result
             if ( (buffer[k] & mask << i) && ( ( 128*k + i ) < NROF_PIECES) )
             {
-                printf("%d \n", (k*128) + i + 1); // Output the numbers, kth buffer element (i+1)th bit
+                printf("%d\n", (k*128) + i + 1); // Output the numbers, kth buffer element (i+1)th bit
             }
         }
     }
