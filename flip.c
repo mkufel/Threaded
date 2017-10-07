@@ -25,7 +25,6 @@ static pthread_mutex_t mutexes[sizeof(buffer)/sizeof(uint128_t )];
 static uint128_t mask = 1; // bit mask used to check the result, initialize with LSB = 1
 static pthread_mutex_t threadlock=PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond_thread=PTHREAD_COND_INITIALIZER;
-static int running_threads = 0;
 
 
 static void *
@@ -36,8 +35,6 @@ do_flip(void * arg) {   //thread job, flip multiples of the passed parameter
     int     param;
 
     param = * (int *) arg;     // casting and dereferencing the passed argument pointer
-    running_threads++;
-
     pthread_mutex_unlock (&threadInitMutex); // value of the param 'retrieved', unlock the threadInitMutex
 
     for (int i = 2; i <= NROF_PIECES; i++) {
@@ -59,8 +56,6 @@ do_flip(void * arg) {   //thread job, flip multiples of the passed parameter
             pthread_cond_signal(&cond_thread);
     pthread_mutex_unlock(&threadlock);
 
-    running_threads--;
-
     return NULL;
 }
 
@@ -77,7 +72,7 @@ void initialize(void)   //Initialize mutexes and set the buffer bits to 1
 
 void create_and_execute_threads(void)
 {
-    pthread_t   my_threads[NROF_PIECES-1];   //array of thread id's
+    pthread_t   my_threads[NROF_THREADS];   //array of thread id's
 
     int *       parameter;   			// parameter to be handed over to the thread
     parameter = malloc (sizeof (int));  // memory will be freed by the child-thread
@@ -86,35 +81,30 @@ void create_and_execute_threads(void)
     int i = 2;
     while (i <= NROF_PIECES)
     {
+        printf("in the loop: %d ", i);
         pthread_mutex_lock(&threadlock);
-
-        if (running_threads == NROF_THREADS)
+        printf("Unlocked ");
+        if (i-1 % NROF_THREADS == 0)
         {
-//            printf("Waiting for some thread to terminate...\n");
             pthread_cond_wait(&cond_thread, &threadlock);
+            sleep(1);
+            printf("Joining\n");
+            for (int j = 0; j < sizeof(my_threads)/sizeof(uint64_t); j++) 					//wait for all threads to terminate
+            {
+                pthread_join (my_threads[j], NULL); // Wait for every single thread in the array
+            }
 
         }
 
         pthread_mutex_lock (&threadInitMutex);
+        printf("Locked the init mutex ");
         * parameter += 1;                               //increase the parameter
-//        printf("Creating a thread with parameter: %d\n", *parameter);
-        pthread_create(&my_threads[i-2], NULL, do_flip,
+        printf("Assigned the param ");
+        pthread_create(&my_threads[i%NROF_THREADS], NULL, do_flip,
                        parameter);                      //make a thread to the flipping with a certain parameter
-
         i++;
-
         pthread_mutex_unlock(&threadlock);
     }
-
-
-//    for (int i = 0; i < NROF_THREADS; i++) {            //create threads
-//        //lock the threadInitMutex, enter iff previously created thread already dereferenced the parameter pointer)
-//        pthread_mutex_lock (&threadInitMutex);
-//
-//        * parameter += 1;                               //increase the parameter
-//        pthread_create(&my_threads[i], NULL, do_flip,
-//                       parameter);                      //make a thread to the flipping with a certain parameter
-//    }
 
     for (int j = 0; j < sizeof(my_threads)/sizeof(uint64_t); j++) 					//wait for all threads to terminate
     {
